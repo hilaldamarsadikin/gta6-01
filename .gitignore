@@ -1,0 +1,12 @@
+# Build output, logs, OS junk, backups and local dependencies — none of
+# these belong in the entry snapshot. Keep the list short: anything the
+# game needs at runtime lives under game/ or screenshots/, never here.
+out/
+out-*/ # dated build directories, same as out/
+*.log
+*.tmp
+*.bak
+*.swp
+.DS_Store
+node_modules/
+playtest/

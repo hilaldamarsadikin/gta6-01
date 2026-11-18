@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="TELUK EMAS — game open-world di browser: sopir pelarian, lima misi, polisi di setiap sudut.">
+<meta name="theme-color" content="#0e1420">
+<meta name="color-scheme" content="dark">
+<title>TELUK EMAS — Open World</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1420;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #f2f2f2;
+    user-select: none; -webkit-user-select: none; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .panel { position: absolute; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+  /* minimap, top-left */
+  #minimap-wrap { top: 14px; left: 14px; }
+  #minimap { width: 190px; height: 190px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.45);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.55); background: #20262e; }
+  /* objective, top-centre, with a MISI tag that never moves */
+  #hud-objective { top: 14px; left: 50%; transform: translateX(-50%); max-width: 560px; text-align: center;
+    background: rgba(10,14,22,0.75); border: 1px solid rgba(255,210,58,0.55); border-left: 5px solid #ffd23a;
+    border-radius: 8px; padding: 8px 16px 8px 14px; font-size: 14px; font-weight: 600; line-height: 1.35; }
+  #hud-objective::before { content: "MISI"; display: block; font-size: 10px; letter-spacing: 3px;
+    color: #ffd23a; margin-bottom: 2px; }
+  #hud-timer { top: 76px; left: 50%; transform: translateX(-50%); background: rgba(10,14,22,0.75);
+    border: 1px solid rgba(255,255,255,0.4); border-radius: 8px; padding: 5px 12px; font-size: 16px; font-weight: 800; }
+  #hud-timer.urgent { color: #ff6b5e; border-color: #ff6b5e; animation: pulse 0.8s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  /* wanted + money, top-right */
+  #hud-right { top: 14px; right: 16px; text-align: right; }
+  #hud-stars { font-size: 28px; letter-spacing: 2px; line-height: 1; }
+  #hud-stars .star { color: rgba(255,255,255,0.25); }
+  #hud-stars .star.on { color: #ffd23a; text-shadow: 0 0 8px rgba(255,210,58,0.8); }
+  #hud-wanted-label { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #ff6b5e; display: none; margin-top: 2px; }
+  #hud-money { font-size: 26px; font-weight: 800; color: #7ee081; margin-top: 4px; }
+  #hud-money.flash { animation: moneyflash 0.9s ease-out; }
+  @keyframes moneyflash { 0% { color: #ffd23a; transform: scale(1.25); } 100% { color: #7ee081; transform: scale(1); } }
+  /* debt line, under the money: the $12.000 Raka still owes Mira */
+  #hud-debt { font-size: 12px; color: #ffb3a0; }
+  /* health, bottom-left */
+  #hud-left { left: 16px; bottom: 16px; width: 230px; }
+  #hud-health-bar { height: 14px; background: rgba(0,0,0,0.6); border-radius: 7px; overflow: hidden; border: 1px solid rgba(255,255,255,0.35); }
+  #hud-health-fill { height: 100%; width: 100%; background: #58b368; }
+  #hud-health-text { font-size: 13px; font-weight: 700; margin-top: 3px; }
+  #hud-feed { margin-top: 10px; font-size: 13px; line-height: 1.5; color: #dfe6ee; }
+  #hud-feed div { background: rgba(10,14,22,0.55); border-radius: 5px; padding: 2px 8px; margin-top: 3px; display: inline-block; }
+  /* speed + ammo, bottom-right */
+  #hud-drive { right: 16px; bottom: 16px; text-align: right; }
+  #hud-speed { font-size: 36px; font-weight: 800; }
+  #hud-ammo { font-size: 16px; font-weight: 700; color: #ffd23a; margin-top: 2px; letter-spacing: 1px; }
+  /* crosshair: a little larger than before so it reads on bright roads */
+  #hud-crosshair { left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.9); display: none; box-shadow: 0 0 4px rgba(0,0,0,0.6); }
+  .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 12, 20, 0.82); z-index: 10; }
+  .screen-inner { max-width: 620px; padding: 28px 34px; text-align: center; }
+  .screen h1 { font-size: 54px; margin: 0 0 4px; letter-spacing: 4px; color: #ffd23a;
+    text-shadow: 0 3px 0 #8a5a10, 0 6px 24px rgba(0,0,0,0.7); }
+  .screen h2 { font-size: 15px; font-weight: 600; color: #9fc4d8; letter-spacing: 3px; margin: 0 0 18px; text-transform: uppercase; }
+  .screen p { font-size: 15px; line-height: 1.6; color: #dfe6ee; }
+  .screen .controls { text-align: left; display: inline-block; font-size: 14px; line-height: 1.9; color: #c8d2de; margin: 10px 0 18px; }
+  .screen button { pointer-events: auto; cursor: pointer; font-size: 19px; font-weight: 800; letter-spacing: 1px;
+    color: #1a1a1e; background: #ffd23a; border: none; border-radius: 10px; padding: 13px 38px; }
+  .screen button:hover { background: #ffe06e; }
+  #title-save { font-size: 13px; color: #8b93a3; margin-top: 14px; }
+  #screen-pause, #screen-over { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Teluk Emas: kota terbuka, jalan kaki dan mengemudi"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+<noscript><p style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Teluk Emas butuh JavaScript untuk berjalan.</p></noscript>
+
+<div id="minimap-wrap" class="panel"><canvas id="minimap" width="190" height="190" aria-label="Peta mini Teluk Emas"></canvas></div>
+<div id="hud-objective" class="panel">Memuat Teluk Emas…</div>
+<div id="hud-timer" class="panel" style="display:none"></div>
+<div id="hud-right" class="panel">
+  <div id="hud-stars"></div>
+  <div id="hud-wanted-label">BURON</div>
+  <div id="hud-money">$350</div>
+  <div id="hud-debt">Utang ke Mira: $12.000</div>
+</div>
+<div id="hud-left" class="panel">
+  <div id="hud-health-bar"><div id="hud-health-fill"></div></div>
+  <div id="hud-health-text">100 / 100</div>
+  <div id="hud-feed"></div>
+</div>
+<div id="hud-drive" class="panel">
+  <div id="hud-speed" style="display:none"></div>
+  <div id="hud-ammo" style="display:none"></div>
+</div>
+<div id="hud-crosshair" class="panel"></div>
+
+<div id="screen-title" class="screen">
+  <div class="screen-inner">
+    <h1>TELUK EMAS</h1>
+    <h2>Kota pesisir &middot; Sopir pelarian &middot; Satu utang besar</h2>
+    <p>Raka berutang $12.000 pada Mira, fixer Teluk Emas. Lima pekerjaan, satu
+    malam panjang — dan polisi di setiap sudut. Curi mobil, kabur dari kejaran,
+    antar paket, dan lunasi utangmu.</p>
+    <div class="controls">
+      W A S D — jalan / mengemudi &nbsp;·&nbsp; Shift — lari<br>
+      E — masuk / curi mobil &nbsp;·&nbsp; F — keluar mobil<br>
+      Klik kiri — tembak &nbsp;·&nbsp; Q — pukul &nbsp;·&nbsp; R — isi peluru<br>
+      Spasi — rem tangan &nbsp;·&nbsp; H — klakson &nbsp;·&nbsp; T — taksi &nbsp;·&nbsp; M — suara &nbsp;·&nbsp; P — jeda
+    </div>
+    <br>
+    <button id="btn-start">MULAI</button>
+    <div id="title-save"></div>
+  </div>
+</div>
+
+<div id="screen-pause" class="screen">
+  <div class="screen-inner">
+    <h1 style="font-size:40px">JEDA</h1>
+    <p>Teluk Emas menunggumu. Progres tersimpan otomatis.</p>
+    <button id="btn-resume">LANJUTKAN</button>
+  </div>
+</div>
+
+<div id="screen-over" class="screen">
+  <div class="screen-inner">
+    <h1 style="font-size:40px">RAKA TUMBANG</h1>
+    <p id="over-text">Polisi menangkapmu di tengah kota.</p>
+    <button id="btn-restart">COBA LAGI</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
